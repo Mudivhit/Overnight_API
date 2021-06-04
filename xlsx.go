@@ -1,78 +1,30 @@
-package main
+package xlsx
 
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/tealeg/xlsx"
 	"io/ioutil"
-	"os"
-	"strconv"
 	"strings"
 	"time"
+	"github.com/tealeg/xlsx"
 )
 
-type Rows struct {
-	Rows []Row `json:"Row"`
+type PastMarketPrices struct {
+	Row []Row `json:"Row"`
 }
 
 type Row struct {
-	TIMESTAMP string  `json:"TIMESTAMP"`
-	OPEN      float64 `json:"OPEN"`
-	HIGH      float64 `json:"HIGH"`
-	LOW       float64 `json:"LOW"`
-	CLOSE     float64 `json:"CLOSE"`
-	BID       float64 `json:"BID"`
-	ASK       float64 `json:"ASK"`
+	Open      float64 `json:"OPEN"`
+	High      float64 `json:"HIGH"`
+	Low       float64 `json:"LOW"`
+	Close     float64 `json:"CLOSE"`
+	Bid       float64 `json:"BID"`
+	Ask       float64 `json:"ASK"`
+	Timestamp string  `json:"TIMESTAMP"`
 }
 
-func rowMaker(cell *xlsx.Cell, row *xlsx.Row, sheet *xlsx.Sheet){
-
-	row = sheet.AddRow()
-	row.SetHeightCM(0.5)
-	cell = row.AddCell()
-	cell.Value ="DATE"
-	cell = row.AddCell()
-	cell.Value ="TIME"
-	cell = row.AddCell()
-	cell.Value ="OPEN"
-	cell = row.AddCell()
-	cell.Value ="HIGH"
-	cell = row.AddCell()
-	cell.Value ="LOW"
-	cell = row.AddCell()
-	cell.Value ="CLOSE"
-	cell = row.AddCell()
-	cell.Value ="ASK"
-	cell = row.AddCell()
-	cell.Value ="BID"
-}
-
-func rowPop(cell *xlsx.Cell, row *xlsx.Row, sheet *xlsx.Sheet,date time.Time, time time.Time, bid string, ask string, close string, high string, low string, open string ){
-	row = sheet.AddRow()
-	row.SetHeightCM(0.5)
-	cell = row.AddCell()
-	cell.SetDate(date)
-	cell.SetFormat("D MMM YYYY")
-	cell = row.AddCell()
-	cell.SetDateTime(time)
-	cell.SetFormat("HH:MM AM/PM")
-	cell = row.AddCell()
-	cell.Value = open
-	cell = row.AddCell()
-	cell.Value = high
-	cell = row.AddCell()
-	cell.Value = low
-	cell = row.AddCell()
-	cell.Value = close
-	cell = row.AddCell()
-	cell.Value = ask
-	cell = row.AddCell()
-	cell.Value = bid
-
-}
-
-func timeConv(tstamp string) time.Time{
-	var date = strings.Replace(tstamp, "+00:00", "Z",1)
+func timeConv(tstamp string) time.Time {
+	var date = strings.Replace(tstamp, "+00:00", "Z", 1)
 
 	result, err := time.Parse(time.RFC3339, date)
 	if err != nil {
@@ -85,45 +37,103 @@ func timeConv(tstamp string) time.Time{
 func main() {
 	var file *xlsx.File
 	var sheet *xlsx.Sheet
-	var row  *xlsx.Row
+	var firstRow, nextRows *xlsx.Row
 	var cell *xlsx.Cell
 	var err error
 
-	jsonFile, err := os.Open("sss.json")
-	// if we os.Open returns an error then handle it
-	if err != nil {
-		fmt.Println(err)
-	}
-	fmt.Println("Successfully Opened users.json")
-	// defer the closing of our jsonFile so that we can parse it later on
-
-	// read our opened jsonFile as a byte array.
-	byteValue, _ := ioutil.ReadAll(jsonFile)
-	// we initialize our Users array
-	var Rows Rows
-	// we unmarshal our byteArray which contains our
-	json.Unmarshal(byteValue, &Rows)
+	jsonDataFromFile, err := ioutil.ReadFile("./GetIntradayTimeSeries_Response_5.json")
 
 	file = xlsx.NewFile()
 	sheet, err = file.AddSheet("Sheet1")
-	if err != nil {
-		fmt.Printf(err.Error())
-	}
-	rowMaker(cell, row, sheet)
 
-	for i := 0; i < len(Rows.Rows); i++ {
-		var date = timeConv(Rows.Rows[i].TIMESTAMP)
-		var bid = strconv.FormatFloat(Rows.Rows[i].BID, 'f', 6, 32)
-		var ask = strconv.FormatFloat(Rows.Rows[i].ASK, 'f', 6, 32)
-		var close = strconv.FormatFloat(Rows.Rows[i].CLOSE, 'f', 6, 32)
-		var high = strconv.FormatFloat(Rows.Rows[i].HIGH, 'f', 6, 32)
-		var low = strconv.FormatFloat(Rows.Rows[i].LOW, 'f', 6, 32)
-		var open = strconv.FormatFloat(Rows.Rows[i].OPEN, 'f', 6, 32)
-		rowPop(cell , row , sheet , date, date , bid , ask , close , high , low , open)
+	if err != nil {
+		fmt.Println(err.Error())
 	}
-	err = file.Save("lets_see.xlsx")
+
+	var jsonData map[string]interface{}
+	err = json.Unmarshal([]byte(jsonDataFromFile), &jsonData)
+
+	b := make([]byte, 10)
+	b, err = json.Marshal(jsonData["GetIntradayTimeSeries_Response_5"])
+	err = json.Unmarshal(b, &jsonData)
+
+	ls := make([]byte, 10)
+	ls, err = json.Marshal(jsonData["Row"])
+	n := make([]interface{}, 10)
+	err = json.Unmarshal(ls, &n)
+
+	firstRow = sheet.AddRow()
+	firstRow.SetHeightCM(0.5)
+
+	cell = firstRow.AddCell()
+	cell.Value = "Date"
+
+	cell = firstRow.AddCell()
+	cell.Value = "Time"
+
+	cell = firstRow.AddCell()
+	cell.Value = "Open"
+
+	cell = firstRow.AddCell()
+	cell.Value = "High"
+
+	cell = firstRow.AddCell()
+	cell.Value = "Low"
+
+	cell = firstRow.AddCell()
+	cell.Value = "Close"
+
+	cell = firstRow.AddCell()
+	cell.Value = "Bid"
+
+	cell = firstRow.AddCell()
+	cell.Value = "Ask"
+
+	for _, val := range n {
+		var row Row
+
+		nextRows = sheet.AddRow()
+		nextRows.SetHeightCM(0.5)
+
+		item := make([]byte, 10)
+		item, err = json.Marshal(val)
+		json.Unmarshal(item, &row)
+
+		var date = timeConv(row.Timestamp)
+
+		cell = nextRows.AddCell()
+		cell.SetDate(date)
+		cell.SetFormat("D MMM YYYY")
+		cell = nextRows.AddCell()
+		cell.SetDateTime(date)
+		cell.SetFormat("HH:MM AM/PM")
+
+		cell = nextRows.AddCell()
+		cell.Value = fmt.Sprintf("%f", row.Open)
+
+		cell = nextRows.AddCell()
+		cell.Value = fmt.Sprintf("%f", row.High)
+
+		cell = nextRows.AddCell()
+		cell.Value = fmt.Sprintf("%f", row.Low)
+
+		cell = nextRows.AddCell()
+		cell.Value = fmt.Sprintf("%f", row.Close)
+
+		cell = nextRows.AddCell()
+		cell.Value = fmt.Sprintf("%f", row.Bid)
+
+		cell = nextRows.AddCell()
+		cell.Value = fmt.Sprintf("%f", row.Ask)
+
+		// cell = nextRows.AddCell()
+		// cell.Value = row.Timestamp
+
+	}
+
+	err = file.Save("GetIntradayTimeSeries_excel.xlsx")
 	if err != nil {
 		fmt.Printf(err.Error())
 	}
-	jsonFile.Close()
-}	
+
+}
