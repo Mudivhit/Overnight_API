@@ -81,6 +81,7 @@ func timeConv(tstamp string) time.Time{
 
 	return result
 }
+
 func main() {
 	var file *xlsx.File
 	var sheet *xlsx.Sheet
@@ -125,4 +126,4 @@ func main() {
 		fmt.Printf(err.Error())
 	}
 	jsonFile.Close()
-}
+}	
